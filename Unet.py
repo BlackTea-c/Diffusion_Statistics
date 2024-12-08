@@ -75,6 +75,7 @@ class ResidualBlock(Module):
 
     A residual block has two convolution layers with group normalization.
     Each resolution is processed with two residual blocks.
+    每一个Residual block都有两层CNN做特征提取
     """
 
     def __init__(self, in_channels: int, out_channels: int, time_channels: int,
@@ -87,9 +88,9 @@ class ResidualBlock(Module):
         * `dropout` is the dropout rate
         """
         super().__init__()
-        # Group normalization and the first convolution layer
+        # 第一层卷积：Group normalization and the first convolution layer
         self.norm1 = nn.GroupNorm(n_groups, in_channels)
-        self.act1 = Swish()
+        self.act1 = Swish() #激活函数
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=(3, 3), padding=(1, 1))
 
         # Group normalization and the second convolution layer
@@ -306,19 +307,17 @@ class UNet(Module):
             image_channels：原始输入图片的channel数，对RGB图像来说就是3
 
             n_channels：    在进UNet之前，会对原始图片做一次初步卷积，该初步卷积对应的
-                            out_channel数，也就是图中左上角的第一个墨绿色箭头
+                            out_channel数
 
             ch_mults：      在Encoder下采样的每一层的out_channels倍数，
                             例如ch_mults[i] = 2，表示第i层特征图的out_channel数，
                             是第i-1层的2倍。Decoder上采样时也是同理，用的是反转后的ch_mults
 
             is_attn：       在Encoder下采样/Decoder上采样的每一层，是否要在CNN做特征提取后再引入attention
-                           （会在下文对该结构进行详细说明）
 
-            n_blocks：      在Encoder下采样/Decoder下采样的每一层，需要用多少个DownBlock/UpBlock（见图），
+            n_blocks：      在Encoder下采样/Decoder下采样的每一层，需要用多少个DownBlock/UpBlock，
                             Deocder层最终使用的UpBlock数=n_blocks + 1
 
-        【到此为止没有完全看懂注释也没关系，可以一遍打开示意图，一遍继续往下阅读源码，就能满满加深理解】
         """
         super().__init__()
 
@@ -327,7 +326,7 @@ class UNet(Module):
         # 这里指的就是不同图像分辨率的个数，也可以理解成是Encoder/Decoder的层数
         n_resolutions = len(ch_mults)
 
-        # 对原始图片做预处理，例如图中，将32*32*3 -> 32*32*64
+        # 用Conv2d对原始图片做预处理，例如将32*32*3 -> 32*32*64
         self.image_proj = nn.Conv2d(image_channels, n_channels, kernel_size=(3, 3), padding=(1, 1))
 
         # time_embedding，TimeEmbedding是nn.Module子类，我们会在下文详细讲解它的属性和forward方法
@@ -428,3 +427,33 @@ class UNet(Module):
                 x = m(x, t)
 
         return self.final(self.act(self.norm(x)))
+
+
+if __name__ == '__main__':
+    import torch
+    import torch.nn as nn
+
+    print('开始模拟....')
+
+    # 定义模型参数
+    image_channels = 3
+    image_size = 64  # 假设输入图片大小为 64x64
+    batch_size = 4
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # 实例化 UNet 模型
+    model = UNet(image_channels=image_channels, n_channels=64).to(device)
+
+    # 模拟输入数据
+    x = torch.randn(batch_size, image_channels, image_size, image_size).to(device)  # 输入图片
+    t = torch.randint(0, 1000, (batch_size,), dtype=torch.long).to(device)  # 时间步长（整数）
+    print("输入尺寸:", x.shape)
+    print("时间步长尺寸:", t.shape)
+
+    # Forward一下
+    with torch.no_grad():
+        output = model(x, t)
+
+
+    print("最终输出尺寸，当然是一样的:", output.shape)
+
