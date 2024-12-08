@@ -9,8 +9,6 @@ from torch import nn
 
 from labml_nn.diffusion.ddpm.utils import gather
 
-
-
 class DenoiseDiffusion:
     """
     Denoise Diffusion
